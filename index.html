@@ -342,14 +342,14 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Bottom Nav */
+        /* Bottom Nav — верхнее выпирание убрано, панель не опущена */
         .bottom-nav {
-            height: 200px;            /* высота 200px */
+            height: 200px;
             background: var(--surface);
             display: flex;
             justify-content: space-around;
-            align-items: center;
-            padding: 8px 0 16px;      /* верхний отступ уменьшен */
+            align-items: flex-start;  /* иконки прижаты к верху, убирает лишний отступ */
+            padding: 0 0 16px;        /* верхний отступ = 0, нижний — 16px */
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -366,19 +366,19 @@
         }
 
         .nav-link i {
-            font-size: 24px;          /* иконки меньше */
+            font-size: 24px;
             margin-bottom: 4px;
         }
 
         .nav-link span {
             display: block;
-            font-size: 14px;           /* текст чуть меньше */
+            font-size: 14px;
             font-weight: 700;
         }
 
         #toast {
             position: absolute;
-            bottom: 220px;             /* поднят выше */
+            bottom: 220px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent);
@@ -456,6 +456,14 @@
             border: 2px solid var(--accent) !important;
             background: var(--accent-soft) !important;
         }
+
+        /* Индикатор загрузки */
+        .loading-spinner {
+            width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite;
+            display: inline-block; margin-right: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -491,7 +499,7 @@
             <i class="fas fa-lock"></i>
             <input type="password" id="reg-pass" placeholder="PIN (letters, numbers, _)" maxlength="32">
         </div>
-        <button class="btn-primary" onclick="app.handleAuth()">
+        <button class="btn-primary" id="auth-btn" onclick="app.handleAuth()">
             Unlock Vault <i class="fas fa-arrow-right" style="margin-left:8px"></i>
         </button>
         <p style="color:var(--text-dim); text-align:center; margin-top:20px; font-size:13px;">
@@ -517,8 +525,8 @@
             <div class="balance-hero">
                 <div class="sub">Total Portfolio Value <i class="fas fa-circle-info"></i></div>
                 <div class="val" id="main-balance">$0.00</div>
-                <div style="color:var(--success); font-weight:700; font-size:14px;">
-                    <i class="fas fa-arrow-trend-up"></i> +4.25% Today
+                <div style="color:var(--success); font-weight:700; font-size:14px;" id="daily-change">
+                    <i class="fas fa-arrow-trend-up"></i> +0.00% Today
                 </div>
             </div>
 
@@ -610,7 +618,7 @@
                     <i class="fas fa-dollar-sign"></i>
                     <input type="number" id="send-amount" placeholder="0.00" step="0.01">
                 </div>
-                <button class="btn-primary" onclick="app.confirmSend()">Sign & Send</button>
+                <button class="btn-primary" id="send-btn" onclick="app.confirmSend()">Sign & Send</button>
             </div>
 
             <!-- Receive Modal -->
@@ -637,7 +645,7 @@
                     <i class="fas fa-dollar-sign"></i>
                     <input type="number" id="deposit-amount" placeholder="Amount" step="0.01">
                 </div>
-                <button class="btn-primary" onclick="app.deposit()">Add Funds</button>
+                <button class="btn-primary" id="deposit-btn" onclick="app.deposit()">Add Funds</button>
             </div>
 
             <!-- Withdraw Modal -->
@@ -651,7 +659,7 @@
                     <i class="fas fa-dollar-sign"></i>
                     <input type="number" id="withdraw-amount" placeholder="Amount" step="0.01">
                 </div>
-                <button class="btn-primary" onclick="app.withdraw()">Withdraw</button>
+                <button class="btn-primary" id="withdraw-btn" onclick="app.withdraw()">Withdraw</button>
             </div>
 
             <!-- Accounts Modal -->
@@ -678,14 +686,13 @@
                     <i class="fas fa-dollar-sign"></i>
                     <input type="number" id="admin-amount" placeholder="Amount (negative to deduct)" step="0.01">
                 </div>
-                <button class="btn-primary" onclick="app.adminAction()">Apply</button>
+                <button class="btn-primary" id="admin-btn" onclick="app.adminAction()">Apply</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // JavaScript без изменений (полный, как в предыдущей версии)
     (function(){
         const COINS = [
             { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'https://assets.coingecko.com/coins/images/325/small/Tether.png', price: 1.00 },
@@ -708,14 +715,19 @@
 
         class PremiumWallet {
             constructor() {
-                this.db = null;
-                this.user = null;
-                this.allUsers = [];
-                this.transactions = [];
+                this.db = null; this.user = null; this.allUsers = []; this.transactions = [];
                 this.init();
             }
-
             async init() {
+                // Гарантированное скрытие сплэш-скрина через 2 секунды
+                setTimeout(() => {
+                    const splash = document.getElementById('splash-screen');
+                    if (splash && splash.style.display !== 'none') {
+                        splash.style.opacity = '0';
+                        setTimeout(() => { if (splash) splash.style.display = 'none'; }, 300);
+                    }
+                }, 2000);
+
                 try {
                     this.db = await this.setupDB();
                     await this.loadUsers();
@@ -725,11 +737,7 @@
                     const lastUser = localStorage.getItem('mindcase_last_user');
                     if (lastUser) {
                         const found = this.allUsers.find(u => u.name === lastUser);
-                        if (found) {
-                            this.user = found;
-                            this.start();
-                            return;
-                        }
+                        if (found) { this.user = found; this.start(); return; }
                     }
                     this.showAuthScreen();
                 } catch (e) {
@@ -737,131 +745,130 @@
                     this.showAuthScreen();
                 }
             }
-
             showAuthScreen() {
                 const splash = document.getElementById('splash-screen');
-                splash.style.opacity = '0';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    document.getElementById('screen-auth').style.display = 'flex';
-                }, 300);
+                if (splash) {
+                    splash.style.opacity = '0';
+                    setTimeout(() => {
+                        if (splash) splash.style.display = 'none';
+                        const authScreen = document.getElementById('screen-auth');
+                        if (authScreen) authScreen.style.display = 'flex';
+                    }, 300);
+                }
             }
-
             start() {
                 const splash = document.getElementById('splash-screen');
-                splash.style.opacity = '0';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    document.getElementById('screen-auth').style.display = 'none';
-                    document.getElementById('main-ui').style.display = 'flex';
-                    this.renderDashboard();
-                    this.populateSelects();
-                    document.getElementById('admin-panel-btn').style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
-                    this.switchView('wallet');
-                }, 300);
+                if (splash) {
+                    splash.style.opacity = '0';
+                    setTimeout(() => {
+                        if (splash) splash.style.display = 'none';
+                        const authScreen = document.getElementById('screen-auth');
+                        const mainUI = document.getElementById('main-ui');
+                        if (authScreen) authScreen.style.display = 'none';
+                        if (mainUI) mainUI.style.display = 'flex';
+                        this.renderDashboard();
+                        this.populateSelects();
+                        const adminBtn = document.getElementById('admin-panel-btn');
+                        if (adminBtn) adminBtn.style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
+                        this.switchView('wallet');
+                    }, 300);
+                }
             }
-
             setupDB() {
-                return new Promise(r => {
-                    const req = indexedDB.open("MindcaseVault", 15);
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open('MindcaseVault', 21);
                     req.onupgradeneeded = e => {
                         const db = e.target.result;
-                        if(!db.objectStoreNames.contains("users")) db.createObjectStore("users", { keyPath: "name" });
-                        if(!db.objectStoreNames.contains("transactions")) db.createObjectStore("transactions", { autoIncrement: true, keyPath: "id" });
+                        if(!db.objectStoreNames.contains('users')) db.createObjectStore('users', { keyPath: 'name' });
+                        if(!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', { autoIncrement: true, keyPath: 'id' });
                     };
-                    req.onsuccess = e => r(e.target.result);
+                    req.onsuccess = e => resolve(e.target.result);
+                    req.onerror = e => reject(e.target.error);
                 });
             }
-
             async loadUsers() {
-                return new Promise(resolve => {
-                    const tx = this.db.transaction("users", "readonly");
-                    tx.objectStore("users").getAll().onsuccess = async e => {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('users', 'readonly');
+                    const store = tx.objectStore('users');
+                    const req = store.getAll();
+                    req.onsuccess = async e => {
                         this.allUsers = e.target.result || [];
                         if (!this.allUsers.find(u => u.name === 'CentralCity')) {
-                            const admin = {
-                                name: 'CentralCity',
-                                pin: 'centralcity',
-                                balances: { usdt: 100000, ton: 10000, btc: 2, eth: 50 },
-                                addresses: {}
-                            };
+                            const admin = { name: 'CentralCity', pin: 'centralcity', balances: { usdt: 100000, ton: 10000, btc: 2, eth: 50 }, addresses: {}, dailySnapshot: {} };
                             COINS.forEach(c => admin.addresses[c.id] = generateAddress(c.id));
+                            admin.dailySnapshot = { total: this.calcTotal(admin.balances), timestamp: Date.now() };
                             this.allUsers.push(admin);
                             await this.saveUser(admin);
                         }
+                        this.allUsers.forEach(u => { if (!u.dailySnapshot) u.dailySnapshot = { total: this.calcTotal(u.balances), timestamp: Date.now() - 86400000 }; });
                         resolve();
                     };
+                    req.onerror = e => reject(e.target.error);
                 });
             }
-
+            calcTotal(balances) {
+                let total = 0;
+                COINS.forEach(c => total += (balances[c.id] || 0) * c.price);
+                return total;
+            }
             async loadTransactions() {
-                return new Promise(resolve => {
-                    const tx = this.db.transaction("transactions", "readonly");
-                    tx.objectStore("transactions").getAll().onsuccess = e => {
-                        this.transactions = e.target.result || [];
-                        resolve();
-                    };
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('transactions', 'readonly');
+                    const req = tx.objectStore('transactions').getAll();
+                    req.onsuccess = e => { this.transactions = e.target.result || []; resolve(); };
+                    req.onerror = e => reject(e.target.error);
                 });
             }
-
             async saveUser(user) {
-                return new Promise(resolve => {
-                    const tx = this.db.transaction("users", "readwrite");
-                    tx.objectStore("users").put(user);
-                    tx.oncomplete = resolve;
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('users', 'readwrite');
+                    const store = tx.objectStore('users');
+                    const req = store.put(user);
+                    req.onsuccess = () => resolve();
+                    req.onerror = e => reject(e.target.error);
                 });
             }
-
             async saveTransaction(tx) {
-                return new Promise(resolve => {
-                    const trans = this.db.transaction("transactions", "readwrite");
-                    const store = trans.objectStore("transactions");
-                    store.add(tx);
-                    trans.oncomplete = () => { this.transactions.push(tx); resolve(); };
+                return new Promise((resolve, reject) => {
+                    const trans = this.db.transaction('transactions', 'readwrite');
+                    const store = trans.objectStore('transactions');
+                    const req = store.add(tx);
+                    req.onsuccess = () => { this.transactions.push(tx); resolve(); };
+                    req.onerror = e => reject(e.target.error);
                 });
             }
-
             setupThemeToggle() {
                 const theme = localStorage.getItem('theme') || 'dark';
                 document.body.classList.toggle('light', theme === 'light');
                 const toggle = document.getElementById('theme-switch');
-                if (toggle) {
-                    toggle.checked = theme === 'light';
-                    toggle.addEventListener('change', e => {
-                        document.body.classList.toggle('light', e.target.checked);
-                        localStorage.setItem('theme', e.target.checked ? 'light' : 'dark');
-                    });
-                }
+                if (toggle) { toggle.checked = theme === 'light'; toggle.addEventListener('change', e => { document.body.classList.toggle('light', e.target.checked); localStorage.setItem('theme', e.target.checked ? 'light' : 'dark'); }); }
             }
-
             validateUsername(name) { return /^[A-Za-z]{3,12}$/.test(name); }
             validatePassword(pass) { return /^[A-Za-z0-9_]{4,32}$/.test(pass); }
 
-            handleAuth() {
+            async handleAuth() {
                 const name = document.getElementById('reg-name').value.trim();
                 const pin = document.getElementById('reg-pass').value;
                 const err = document.getElementById('auth-error');
-                
+                const btn = document.getElementById('auth-btn');
                 if(!this.validateUsername(name)) return err.textContent = 'Username: only English letters, 3-12 chars';
                 if(!this.validatePassword(pin)) return err.textContent = 'PIN: letters, numbers, _, 4-32 chars';
-
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner"></span>Unlocking...';
+                await new Promise(r => setTimeout(r, 600));
                 let existing = this.allUsers.find(u => u.name === name);
                 if (existing) {
-                    if (existing.pin !== pin) return err.textContent = 'Incorrect PIN';
+                    if (existing.pin !== pin) { btn.disabled = false; btn.innerHTML = 'Unlock Vault'; return err.textContent = 'Incorrect PIN'; }
                     this.user = existing;
                 } else {
-                    const newUser = {
-                        name, pin,
-                        balances: { usdt: 0, ton: 0, btc: 0, eth: 0 },
-                        addresses: {}
-                    };
+                    const newUser = { name, pin, balances: { usdt: 0, ton: 0, btc: 0, eth: 0 }, addresses: {}, dailySnapshot: { total: 0, timestamp: Date.now() } };
                     COINS.forEach(c => newUser.addresses[c.id] = generateAddress(c.id));
                     this.allUsers.push(newUser);
-                    this.saveUser(newUser);
+                    await this.saveUser(newUser);
                     this.user = newUser;
                 }
-
                 localStorage.setItem('mindcase_last_user', this.user.name);
+                btn.disabled = false; btn.innerHTML = 'Unlock Vault';
                 this.start();
             }
 
@@ -870,57 +877,40 @@
                 const addr = this.user.addresses?.['usdt'] || generateAddress('usdt');
                 document.getElementById('copy-addr-val').value = addr;
                 document.getElementById('qr-dest').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${addr}`;
-                
-                let total = 0;
+                const total = this.calcTotal(this.user.balances);
+                document.getElementById('main-balance').innerText = `$${total.toFixed(2)}`;
+                const snapshot = this.user.dailySnapshot || { total: total, timestamp: Date.now() - 86400000 };
+                const change = total - snapshot.total;
+                const changePercent = snapshot.total > 0 ? (change / snapshot.total) * 100 : 0;
+                const sign = change >= 0 ? '+' : '';
+                const arrow = change >= 0 ? 'arrow-trend-up' : 'arrow-trend-down';
+                document.getElementById('daily-change').innerHTML = `<i class="fas fa-${arrow}"></i> ${sign}${changePercent.toFixed(2)}% Today`;
                 const list = document.getElementById('asset-list');
                 list.innerHTML = '';
                 COINS.forEach(c => {
                     const bal = this.user.balances[c.id] || 0;
                     const usd = bal * c.price;
-                    total += usd;
                     const div = document.createElement('div');
                     div.className = 'asset-item';
-                    div.innerHTML = `
-                        <img src="${c.icon}" class="asset-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
-                        <div style="display:none; width:44px; height:44px; border-radius:14px; background:#1A2636; align-items:center; justify-content:center; font-size:20px; font-weight:700;">${c.symbol.charAt(0)}</div>
-                        <div class="asset-info">
-                            <div class="asset-name">${c.name}</div>
-                            <div class="asset-price">$${c.price.toLocaleString()}</div>
-                        </div>
-                        <div class="asset-right">
-                            <div class="asset-name">${bal.toFixed(4)} ${c.symbol}</div>
-                            <div class="asset-price" style="color:var(--success)">$${usd.toFixed(2)}</div>
-                        </div>
-                    `;
+                    div.innerHTML = `<img src="${c.icon}" class="asset-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"><div style="display:none; width:44px; height:44px; border-radius:14px; background:#1A2636; align-items:center; justify-content:center; font-size:20px;">${c.symbol.charAt(0)}</div><div class="asset-info"><div class="asset-name">${c.name}</div><div class="asset-price">$${c.price.toLocaleString()}</div></div><div class="asset-right"><div class="asset-name">${bal.toFixed(4)} ${c.symbol}</div><div class="asset-price" style="color:var(--success)">$${usd.toFixed(2)}</div></div>`;
                     list.appendChild(div);
                 });
-                document.getElementById('main-balance').innerText = `$${total.toFixed(2)}`;
                 this.renderHistoryList();
             }
-
             renderHistoryList() {
                 const container = document.getElementById('history-list-container');
                 if(!container) return;
                 const userTxs = this.transactions.filter(tx => tx.from === this.user.name || tx.to === this.user.name).sort((a,b) => b.timestamp - a.timestamp);
                 container.innerHTML = userTxs.map(tx => {
                     const incoming = tx.to === this.user.name;
-                    return `<div class="history-item">
-                        <div class="history-icon"><i class="fas fa-${incoming?'arrow-down':'arrow-up'}"></i></div>
-                        <div class="history-details">
-                            <div class="history-title">${tx.description || (incoming?'Received':'Sent')}</div>
-                            <div class="history-date">${new Date(tx.timestamp).toLocaleString()}</div>
-                        </div>
-                        <div class="history-amount ${incoming?'history-positive':'history-negative'}">${incoming?'+':'-'}${tx.amount.toFixed(2)} ${tx.currency.toUpperCase()}</div>
-                    </div>`;
-                }).join('') || '<p style="color:var(--text-dim); text-align:center;">No transactions</p>';
+                    return `<div class="history-item"><div class="history-icon"><i class="fas fa-${incoming?'arrow-down':'arrow-up'}"></i></div><div><div>${tx.description}</div><small>${new Date(tx.timestamp).toLocaleString()}</small></div><div class="${incoming?'history-positive':'history-negative'}">${incoming?'+':'-'}${tx.amount.toFixed(2)} ${tx.currency.toUpperCase()}</div></div>`;
+                }).join('') || '<p>No transactions</p>';
             }
-
             populateSelects() {
                 const selects = ['send-currency-select', 'deposit-currency-select', 'withdraw-currency-select', 'admin-currency-select'];
                 const options = COINS.map(c => `<option value="${c.id}">${c.symbol}</option>`).join('');
                 selects.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = options; });
             }
-
             openModal(type) {
                 const overlay = document.getElementById('modal-overlay');
                 document.querySelectorAll('[id^="modal-"]').forEach(el => el.style.display = 'none');
@@ -930,17 +920,7 @@
                 if(type === 'withdraw') document.getElementById('modal-withdraw').style.display = 'block';
                 if(type === 'accounts') {
                     document.getElementById('modal-accounts').style.display = 'block';
-                    const cont = document.getElementById('accounts-render');
-                    cont.innerHTML = this.allUsers.map(u => `
-                        <div class="asset-item" onclick="app.switchUser('${u.name}')" style="cursor:pointer; background:var(--surface-light); padding:14px; border-radius:18px; margin-bottom:10px; ${u.name === this.user.name ? 'border: 2px solid var(--accent); background: var(--accent-soft);' : ''}">
-                            <i class="fas fa-user-circle" style="font-size:24px; color:var(--accent)"></i>
-                            <div class="asset-info">
-                                <div class="asset-name">${u.name}</div>
-                                <div class="asset-price">${u.addresses ? Object.values(u.addresses)[0]?.substring(0,10)+'...' : ''}</div>
-                            </div>
-                            ${u.name === this.user.name ? '<i class="fas fa-check" style="color:var(--success)"></i>' : ''}
-                        </div>
-                    `).join('');
+                    document.getElementById('accounts-render').innerHTML = this.allUsers.map(u => `<div class="asset-item" onclick="app.switchUser('${u.name}')" style="cursor:pointer; ${u.name===this.user.name?'border:2px solid var(--accent); background:var(--accent-soft);':''}"><i class="fas fa-user-circle"></i><div>${u.name}</div>${u.name===this.user.name?'✓':''}</div>`).join('');
                 }
                 if(type === 'admin' && this.user.name === 'CentralCity') {
                     document.getElementById('modal-admin').style.display = 'block';
@@ -948,141 +928,117 @@
                 }
                 overlay.style.display = 'flex';
             }
-
             closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
-
-            switchUser(name) {
+            async switchUser(name) {
                 const u = this.allUsers.find(u => u.name === name);
                 if(!u) return;
+                this.closeModal();
+                document.getElementById('main-ui').style.opacity = '0.6';
+                await new Promise(r => setTimeout(r, 300));
                 this.user = u;
                 localStorage.setItem('mindcase_last_user', u.name);
-                this.closeModal();
                 this.renderDashboard();
                 document.getElementById('admin-panel-btn').style.display = u.name === 'CentralCity' ? 'block' : 'none';
+                document.getElementById('main-ui').style.opacity = '1';
                 this.showToast(`Switched to ${u.name}`);
             }
-
             async deleteAccount() {
                 const name = this.user.name;
                 this.allUsers = this.allUsers.filter(u => u.name !== name);
                 const tx = this.db.transaction('users', 'readwrite');
                 tx.objectStore('users').delete(name);
                 tx.oncomplete = async () => {
-                    if (this.allUsers.length > 0) {
+                    if(this.allUsers.length) {
                         this.user = this.allUsers[0];
                         localStorage.setItem('mindcase_last_user', this.user.name);
                         this.renderDashboard();
                         document.getElementById('admin-panel-btn').style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
-                        this.showToast(`Account deleted. Switched to ${this.user.name}`);
+                        this.showToast(`Switched to ${this.user.name}`);
                     } else {
-                        this.user = null;
-                        localStorage.removeItem('mindcase_last_user');
+                        this.user = null; localStorage.removeItem('mindcase_last_user');
                         document.getElementById('main-ui').style.display = 'none';
                         document.getElementById('screen-auth').style.display = 'flex';
-                        document.getElementById('reg-name').value = '';
-                        document.getElementById('reg-pass').value = '';
-                        this.closeModal();
-                        this.showToast('All accounts deleted');
                     }
+                    this.closeModal();
                 };
             }
-
             async confirmSend() {
                 const curr = document.getElementById('send-currency-select').value;
                 const to = document.getElementById('send-addr').value.trim();
                 const amt = parseFloat(document.getElementById('send-amount').value);
-                if(!to || isNaN(amt) || amt <= 0) return this.showToast('Invalid');
+                if(!to || isNaN(amt) || amt<=0) return this.showToast('Invalid');
                 if((this.user.balances[curr]||0) < amt) return this.showToast('Insufficient balance');
                 const recip = this.allUsers.find(u => u.name === to || Object.values(u.addresses||{}).includes(to));
                 if(!recip) return this.showToast('Recipient not found');
                 if(recip.name === this.user.name) return this.showToast('Cannot send to yourself');
-                
+                const btn = document.getElementById('send-btn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>Sending...';
+                await new Promise(r => setTimeout(r, 800));
                 this.user.balances[curr] -= amt;
                 recip.balances[curr] = (recip.balances[curr]||0) + amt;
                 const tx = { from: this.user.name, to: recip.name, currency: curr, amount: amt, description: 'Sent', timestamp: Date.now() };
                 await this.saveTransaction(tx);
                 await this.saveUser(this.user);
                 await this.saveUser(recip);
-                this.closeModal();
-                this.renderDashboard();
-                this.showToast('Sent');
+                btn.disabled = false; btn.innerHTML = 'Send';
+                this.closeModal(); this.renderDashboard(); this.showToast('Sent');
             }
-
             async deposit() {
                 const curr = document.getElementById('deposit-currency-select').value;
                 const amt = parseFloat(document.getElementById('deposit-amount').value);
-                if(isNaN(amt) || amt <= 0) return this.showToast('Invalid amount');
+                if(isNaN(amt)||amt<=0) return this.showToast('Invalid amount');
+                const btn = document.getElementById('deposit-btn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>Depositing...';
+                await new Promise(r => setTimeout(r, 800));
                 this.user.balances[curr] = (this.user.balances[curr]||0) + amt;
-                const tx = { from: 'External', to: this.user.name, currency: curr, amount: amt, description: 'Deposit', timestamp: Date.now() };
-                await this.saveTransaction(tx);
+                await this.saveTransaction({ from: 'External', to: this.user.name, currency: curr, amount: amt, description: 'Deposit', timestamp: Date.now() });
                 await this.saveUser(this.user);
-                this.closeModal();
-                this.renderDashboard();
-                this.showToast('Deposit successful');
+                btn.disabled = false; btn.innerHTML = 'Deposit';
+                this.closeModal(); this.renderDashboard(); this.showToast('Deposit successful');
             }
-
             async withdraw() {
                 const curr = document.getElementById('withdraw-currency-select').value;
                 const amt = parseFloat(document.getElementById('withdraw-amount').value);
-                if(isNaN(amt) || amt <= 0) return this.showToast('Invalid');
+                if(isNaN(amt)||amt<=0) return this.showToast('Invalid');
                 if((this.user.balances[curr]||0) < amt) return this.showToast('Insufficient');
+                const btn = document.getElementById('withdraw-btn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>Withdrawing...';
+                await new Promise(r => setTimeout(r, 800));
                 this.user.balances[curr] -= amt;
-                const tx = { from: this.user.name, to: 'External', currency: curr, amount: amt, description: 'Withdrawal', timestamp: Date.now() };
-                await this.saveTransaction(tx);
+                await this.saveTransaction({ from: this.user.name, to: 'External', currency: curr, amount: amt, description: 'Withdrawal', timestamp: Date.now() });
                 await this.saveUser(this.user);
-                this.closeModal();
-                this.renderDashboard();
-                this.showToast('Withdrawn');
+                btn.disabled = false; btn.innerHTML = 'Withdraw';
+                this.closeModal(); this.renderDashboard(); this.showToast('Withdrawn');
             }
-
             async adminAction() {
                 if(this.user.name !== 'CentralCity') return;
                 const target = document.getElementById('admin-user-select').value;
                 const curr = document.getElementById('admin-currency-select').value;
                 const amt = parseFloat(document.getElementById('admin-amount').value);
-                if(!target || isNaN(amt) || amt === 0) return;
+                if(!target||isNaN(amt)||amt===0) return;
                 const targetUser = this.allUsers.find(u => u.name === target);
                 if(!targetUser) return;
+                const btn = document.getElementById('admin-btn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>Applying...';
+                await new Promise(r => setTimeout(r, 600));
                 targetUser.balances[curr] = (targetUser.balances[curr]||0) + amt;
                 if(targetUser.balances[curr] < 0) targetUser.balances[curr] = 0;
-                const tx = { from: amt>0 ? 'CentralCity' : target, to: amt>0 ? target : 'CentralCity', currency: curr, amount: Math.abs(amt), description: amt>0 ? 'Admin Deposit' : 'Admin Withdrawal', timestamp: Date.now() };
-                await this.saveTransaction(tx);
+                await this.saveTransaction({ from: amt>0?'CentralCity':target, to: amt>0?target:'CentralCity', currency: curr, amount: Math.abs(amt), description: amt>0?'Admin Deposit':'Admin Withdrawal', timestamp: Date.now() });
                 await this.saveUser(targetUser);
-                this.closeModal();
-                this.renderDashboard();
-                this.showToast('Admin action done');
+                btn.disabled = false; btn.innerHTML = 'Apply';
+                this.closeModal(); this.renderDashboard(); this.showToast('Admin action done');
             }
-
-            copyAddress() {
-                navigator.clipboard?.writeText(document.getElementById('copy-addr-val').value);
-                this.showToast('Address copied');
-            }
-
+            copyAddress() { navigator.clipboard?.writeText(document.getElementById('copy-addr-val').value); this.showToast('Address copied'); }
             switchView(view) {
-                document.getElementById('view-wallet').style.display = view === 'wallet' ? 'flex' : 'none';
-                document.getElementById('view-history').style.display = view === 'history' ? 'flex' : 'none';
-                document.getElementById('view-settings').style.display = view === 'settings' ? 'flex' : 'none';
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.view === view));
-                if(view === 'history') this.renderHistoryList();
+                document.getElementById('view-wallet').style.display = view==='wallet'?'flex':'none';
+                document.getElementById('view-history').style.display = view==='history'?'flex':'none';
+                document.getElementById('view-settings').style.display = view==='settings'?'flex':'none';
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.view===view));
+                if(view==='history') this.renderHistoryList();
             }
-
-            showToast(msg) {
-                const t = document.getElementById('toast');
-                t.textContent = msg; t.style.display = 'block';
-                setTimeout(() => t.style.display = 'none', 2000);
-            }
-
-            async logout() {
-                this.user = null;
-                localStorage.removeItem('mindcase_last_user');
-                document.getElementById('main-ui').style.display = 'none';
-                document.getElementById('screen-auth').style.display = 'flex';
-                document.getElementById('reg-name').value = '';
-                document.getElementById('reg-pass').value = '';
-                this.closeModal();
-            }
+            showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+            logout() { this.user = null; localStorage.removeItem('mindcase_last_user'); document.getElementById('main-ui').style.display = 'none'; document.getElementById('screen-auth').style.display = 'flex'; this.closeModal(); }
         }
-
         window.app = new PremiumWallet();
     })();
 </script>
