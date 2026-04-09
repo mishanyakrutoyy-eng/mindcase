@@ -344,12 +344,12 @@
 
         /* Bottom Nav */
         .bottom-nav {
-            height: 120px;            /* Увеличена высота */
+            height: 150px;            /* ЕЩЁ ВЫШЕ */
             background: var(--surface);
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding-bottom: 8px;
+            padding-bottom: 12px;
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -366,19 +366,19 @@
         }
 
         .nav-link i {
-            font-size: 26px;           /* Увеличены иконки */
-            margin-bottom: 6px;
+            font-size: 28px;           /* Увеличены иконки */
+            margin-bottom: 8px;
         }
 
         .nav-link span {
             display: block;
-            font-size: 13px;            /* Увеличен текст */
+            font-size: 14px;            /* Увеличен текст */
             font-weight: 700;
         }
 
         #toast {
             position: absolute;
-            bottom: 140px;               /* Поднят выше */
+            bottom: 170px;               /* Поднят ещё выше */
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent);
@@ -685,7 +685,6 @@
 </div>
 
 <script>
-    // Весь JavaScript остаётся без изменений (как в предыдущей версии)
     (function(){
         const COINS = [
             { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'https://assets.coingecko.com/coins/images/325/small/Tether.png', price: 1.00 },
