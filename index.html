@@ -342,14 +342,14 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Bottom Nav — верхнее выпирание убрано, панель не опущена */
+        /* Bottom Nav — УМЕНЬШЕНА ВЫСОТА */
         .bottom-nav {
-            height: 200px;
+            height: 120px;            /* Было 200px, стало 120px */
             background: var(--surface);
             display: flex;
             justify-content: space-around;
-            align-items: flex-start;  /* иконки прижаты к верху, убирает лишний отступ */
-            padding: 0 0 16px;        /* верхний отступ = 0, нижний — 16px */
+            align-items: center;      /* Центрируем иконки по вертикали */
+            padding: 8px 0 12px;      /* Уменьшены отступы */
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -366,19 +366,19 @@
         }
 
         .nav-link i {
-            font-size: 24px;
+            font-size: 22px;          /* Немного уменьшены иконки */
             margin-bottom: 4px;
         }
 
         .nav-link span {
             display: block;
-            font-size: 14px;
+            font-size: 13px;           /* Немного уменьшен текст */
             font-weight: 700;
         }
 
         #toast {
             position: absolute;
-            bottom: 220px;
+            bottom: 140px;             /* Поднят выше, чтобы не перекрываться */
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent);
@@ -451,12 +451,6 @@
             border-radius: 18px;
         }
 
-        /* Стиль для выделенного аккаунта */
-        .account-item-active {
-            border: 2px solid var(--accent) !important;
-            background: var(--accent-soft) !important;
-        }
-
         /* Индикатор загрузки */
         .loading-spinner {
             width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3);
@@ -464,6 +458,61 @@
             display: inline-block; margin-right: 8px; vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* УЛУЧШЕННЫЙ ДИЗАЙН СПИСКА АККАУНТОВ */
+        .account-card {
+            background: var(--surface-light);
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+            transition: all 0.2s;
+        }
+        .account-card.active {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+        .account-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+        }
+        .account-details {
+            flex: 1;
+        }
+        .account-username {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+        .account-address {
+            font-size: 12px;
+            color: var(--text-dim);
+            font-family: monospace;
+            letter-spacing: 0.5px;
+        }
+        .account-check {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -719,14 +768,14 @@
                 this.init();
             }
             async init() {
-                // Гарантированное скрытие сплэш-скрина через 2 секунды
+                // Гарантированное скрытие сплэш-скрина через 1.5 секунды
                 setTimeout(() => {
                     const splash = document.getElementById('splash-screen');
                     if (splash && splash.style.display !== 'none') {
                         splash.style.opacity = '0';
                         setTimeout(() => { if (splash) splash.style.display = 'none'; }, 300);
                     }
-                }, 2000);
+                }, 1500);
 
                 try {
                     this.db = await this.setupDB();
@@ -920,7 +969,18 @@
                 if(type === 'withdraw') document.getElementById('modal-withdraw').style.display = 'block';
                 if(type === 'accounts') {
                     document.getElementById('modal-accounts').style.display = 'block';
-                    document.getElementById('accounts-render').innerHTML = this.allUsers.map(u => `<div class="asset-item" onclick="app.switchUser('${u.name}')" style="cursor:pointer; ${u.name===this.user.name?'border:2px solid var(--accent); background:var(--accent-soft);':''}"><i class="fas fa-user-circle"></i><div>${u.name}</div>${u.name===this.user.name?'✓':''}</div>`).join('');
+                    const cont = document.getElementById('accounts-render');
+                    // УЛУЧШЕННЫЙ ДИЗАЙН СПИСКА АККАУНТОВ
+                    cont.innerHTML = this.allUsers.map(u => `
+                        <div class="account-card ${u.name === this.user.name ? 'active' : ''}" onclick="app.switchUser('${u.name}')">
+                            <div class="account-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                            <div class="account-details">
+                                <div class="account-username">${u.name}</div>
+                                <div class="account-address">${u.addresses ? Object.values(u.addresses)[0]?.substring(0,12)+'...' : 'No address'}</div>
+                            </div>
+                            ${u.name === this.user.name ? '<div class="account-check"><i class="fas fa-check"></i></div>' : ''}
+                        </div>
+                    `).join('');
                 }
                 if(type === 'admin' && this.user.name === 'CentralCity') {
                     document.getElementById('modal-admin').style.display = 'block';
