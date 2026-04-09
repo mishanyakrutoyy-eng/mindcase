@@ -344,12 +344,12 @@
 
         /* Bottom Nav */
         .bottom-nav {
-            height: 200px;            /* 200px ВЫСОТА */
+            height: 200px;            /* высота 200px */
             background: var(--surface);
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding-bottom: 16px;
+            padding: 8px 0 16px;      /* верхний отступ уменьшен */
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -358,7 +358,7 @@
             color: var(--text-dim);
             text-align: center;
             cursor: pointer;
-            padding: 8px 0;
+            padding: 0;
         }
 
         .nav-link.active {
@@ -366,19 +366,19 @@
         }
 
         .nav-link i {
-            font-size: 32px;           /* Увеличены иконки */
-            margin-bottom: 8px;
+            font-size: 24px;          /* иконки меньше */
+            margin-bottom: 4px;
         }
 
         .nav-link span {
             display: block;
-            font-size: 16px;            /* Увеличен текст */
+            font-size: 14px;           /* текст чуть меньше */
             font-weight: 700;
         }
 
         #toast {
             position: absolute;
-            bottom: 220px;               /* Поднят выше */
+            bottom: 220px;             /* поднят выше */
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent);
