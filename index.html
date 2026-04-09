@@ -342,14 +342,14 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Bottom Nav — УМЕНЬШЕНА ВЫСОТА */
+        /* Bottom Nav — высота 140px */
         .bottom-nav {
-            height: 120px;            /* Было 200px, стало 120px */
+            height: 140px;
             background: var(--surface);
             display: flex;
             justify-content: space-around;
-            align-items: center;      /* Центрируем иконки по вертикали */
-            padding: 8px 0 12px;      /* Уменьшены отступы */
+            align-items: flex-start;
+            padding: 0 0 16px;
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -366,19 +366,19 @@
         }
 
         .nav-link i {
-            font-size: 22px;          /* Немного уменьшены иконки */
+            font-size: 22px;
             margin-bottom: 4px;
         }
 
         .nav-link span {
             display: block;
-            font-size: 13px;           /* Немного уменьшен текст */
+            font-size: 13px;
             font-weight: 700;
         }
 
         #toast {
             position: absolute;
-            bottom: 140px;             /* Поднят выше, чтобы не перекрываться */
+            bottom: 160px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent);
