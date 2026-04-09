@@ -477,11 +477,11 @@
 
         <div class="input-group">
             <i class="fas fa-user"></i>
-            <input type="text" id="reg-name" placeholder="Username" autocomplete="off">
+            <input type="text" id="reg-name" placeholder="Username (English letters only)" maxlength="12">
         </div>
         <div class="input-group">
             <i class="fas fa-lock"></i>
-            <input type="password" id="reg-pass" placeholder="Access PIN" autocomplete="off">
+            <input type="password" id="reg-pass" placeholder="PIN (letters, numbers, _)" maxlength="32">
         </div>
         <button class="btn-primary" onclick="app.handleAuth()">
             Unlock Vault <i class="fas fa-arrow-right" style="margin-left:8px"></i>
@@ -489,6 +489,7 @@
         <p style="color:var(--text-dim); text-align:center; margin-top:20px; font-size:13px;">
             New user? Just enter a username and PIN to create
         </p>
+        <p id="auth-error" style="color:var(--danger); text-align:center; margin-top:8px;"></p>
     </div>
 
     <!-- Main UI -->
@@ -555,10 +556,9 @@
                     <span style="position:absolute; content:''; height:22px; width:22px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.2s;"></span>
                 </label>
             </div>
-            <button class="btn-primary" style="margin-top:24px; background:var(--danger);" onclick="app.logout()">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
+            <button class="btn-primary" style="margin-top:24px; background:var(--danger);" onclick="app.deleteAccount()">
+                <i class="fas fa-trash-alt"></i> Delete Account & Sign Out
             </button>
-            <!-- Кнопка админ-панели отображается только для CentralCity -->
             <button class="btn-primary" id="admin-panel-btn" style="margin-top:10px; background:var(--surface-light); display:none;" onclick="app.openModal('admin')">
                 <i class="fas fa-shield"></i> Admin Panel
             </button>
@@ -680,11 +680,24 @@
     (function(){
         // Надёжные иконки (используем CDN, который отдаёт логотипы)
         const COINS = [
+            { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'https://assets.coingecko.com/coins/images/325/small/Tether.png', price: 1.00 },
             { id: 'ton', name: 'Toncoin', symbol: 'TON', icon: 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png', price: 7.12 },
             { id: 'btc', name: 'Bitcoin', symbol: 'BTC', icon: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png', price: 72400 },
-            { id: 'eth', name: 'Ethereum', symbol: 'ETH', icon: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png', price: 3820 },
-            { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'https://assets.coingecko.com/coins/images/325/small/Tether.png', price: 1.00 }
+            { id: 'eth', name: 'Ethereum', symbol: 'ETH', icon: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png', price: 3820 }
         ];
+
+        // Генерация адресов
+        function generateAddress(currency) {
+            if (currency === 'ton') return 'EQ' + Array.from({length:32},()=>Math.floor(Math.random()*16).toString(16)).join('');
+            if (currency === 'usdt') {
+                return Math.random()>0.5 ? 
+                    '0x' + Array.from({length:40},()=>Math.floor(Math.random()*16).toString(16)).join('') :
+                    'T' + Array.from({length:33},()=>'123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('');
+            }
+            if (currency === 'eth') return '0x' + Array.from({length:40},()=>Math.floor(Math.random()*16).toString(16)).join('');
+            if (currency === 'btc') return 'bc1' + Array.from({length:38},()=>'123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('');
+            return '0x' + Array.from({length:40},()=>Math.floor(Math.random()*16).toString(16)).join('');
+        }
 
         class PremiumWallet {
             constructor() {
@@ -696,31 +709,54 @@
             }
 
             async init() {
-                this.db = await this.setupDB();
-                await this.loadUsers();
-                await this.loadTransactions();
-                this.setupThemeToggle();
+                try {
+                    this.db = await this.setupDB();
+                    await this.loadUsers();
+                    await this.loadTransactions();
+                    this.setupThemeToggle();
 
-                const lastUser = localStorage.getItem('mindcase_last_user');
-                if (lastUser) {
-                    const found = this.allUsers.find(u => u.name === lastUser);
-                    if (found) {
-                        document.getElementById('reg-name').value = found.name;
+                    const lastUser = localStorage.getItem('mindcase_last_user');
+                    if (lastUser) {
+                        const found = this.allUsers.find(u => u.name === lastUser);
+                        if (found) {
+                            this.user = found;
+                            this.start();
+                            return;
+                        }
                     }
+                    this.showAuthScreen();
+                } catch (e) {
+                    console.error(e);
+                    this.showAuthScreen();
                 }
+            }
 
+            showAuthScreen() {
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
                 setTimeout(() => {
-                    document.getElementById('splash-screen').style.opacity = '0';
-                    setTimeout(() => {
-                        document.getElementById('splash-screen').style.display = 'none';
-                        document.getElementById('screen-auth').style.display = 'flex';
-                    }, 400);
-                }, 800);
+                    splash.style.display = 'none';
+                    document.getElementById('screen-auth').style.display = 'flex';
+                }, 300);
+            }
+
+            start() {
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    document.getElementById('screen-auth').style.display = 'none';
+                    document.getElementById('main-ui').style.display = 'flex';
+                    this.renderDashboard();
+                    this.populateSelects();
+                    document.getElementById('admin-panel-btn').style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
+                    this.switchView('wallet');
+                }, 300);
             }
 
             setupDB() {
                 return new Promise(r => {
-                    const req = indexedDB.open("MindcaseVault", 9);
+                    const req = indexedDB.open("MindcaseVault", 15);
                     req.onupgradeneeded = e => {
                         const db = e.target.result;
                         if(!db.objectStoreNames.contains("users")) db.createObjectStore("users", { keyPath: "name" });
@@ -739,9 +775,10 @@
                             const admin = {
                                 name: 'CentralCity',
                                 pin: 'centralcity',
-                                balances: { ton: 10000, btc: 2, eth: 50, usdt: 100000 },
-                                addr: "0xCENTRAL" + Math.random().toString(36).substring(2,8).toUpperCase()
+                                balances: { usdt: 100000, ton: 10000, btc: 2, eth: 50 },
+                                addresses: {}
                             };
+                            COINS.forEach(c => admin.addresses[c.id] = generateAddress(c.id));
                             this.allUsers.push(admin);
                             await this.saveUser(admin);
                         }
@@ -770,13 +807,10 @@
 
             async saveTransaction(tx) {
                 return new Promise(resolve => {
-                    const transaction = this.db.transaction("transactions", "readwrite");
-                    const store = transaction.objectStore("transactions");
+                    const trans = this.db.transaction("transactions", "readwrite");
+                    const store = trans.objectStore("transactions");
                     store.add(tx);
-                    transaction.oncomplete = () => {
-                        this.transactions.push(tx);
-                        resolve();
-                    };
+                    trans.oncomplete = () => { this.transactions.push(tx); resolve(); };
                 });
             }
 
@@ -793,21 +827,28 @@
                 }
             }
 
+            validateUsername(name) { return /^[A-Za-z]{3,12}$/.test(name); }
+            validatePassword(pass) { return /^[A-Za-z0-9_]{4,32}$/.test(pass); }
+
             handleAuth() {
                 const name = document.getElementById('reg-name').value.trim();
                 const pin = document.getElementById('reg-pass').value;
-                if(!name || pin.length < 4) return this.showToast('Enter name and 4+ digit PIN');
+                const err = document.getElementById('auth-error');
+                
+                if(!this.validateUsername(name)) return err.textContent = 'Username: only English letters, 3-12 chars';
+                if(!this.validatePassword(pin)) return err.textContent = 'PIN: letters, numbers, _, 4-32 chars';
 
                 let existing = this.allUsers.find(u => u.name === name);
                 if (existing) {
-                    if (existing.pin !== pin) return this.showToast('Incorrect PIN');
+                    if (existing.pin !== pin) return err.textContent = 'Incorrect PIN';
                     this.user = existing;
                 } else {
                     const newUser = {
                         name, pin,
-                        balances: { ton: 200, btc: 0.1, eth: 2, usdt: 1000 },
-                        addr: "0x" + Math.random().toString(36).substring(2,14).toUpperCase()
+                        balances: { usdt: 0, ton: 0, btc: 0, eth: 0 },
+                        addresses: {}
                     };
+                    COINS.forEach(c => newUser.addresses[c.id] = generateAddress(c.id));
                     this.allUsers.push(newUser);
                     this.saveUser(newUser);
                     this.user = newUser;
@@ -817,31 +858,15 @@
                 this.start();
             }
 
-            start() {
-                document.getElementById('screen-auth').style.display = 'none';
-                document.getElementById('main-ui').style.display = 'flex';
-                this.render();
-                this.renderHistory();
-                this.populateSelects();
-                const adminBtn = document.getElementById('admin-panel-btn');
-                if (adminBtn) {
-                    adminBtn.style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
-                }
-            }
-
-            populateSelects() {
-                const selects = ['send-currency-select', 'deposit-currency-select', 'withdraw-currency-select', 'admin-currency-select'];
-                const options = COINS.map(c => `<option value="${c.id}">${c.symbol} - ${c.name}</option>`).join('');
-                selects.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerHTML = options;
-                });
-            }
-
-            render() {
+            renderDashboard() {
+                document.getElementById('active-user-display').innerText = this.user.name;
+                const addr = this.user.addresses?.['usdt'] || generateAddress('usdt');
+                document.getElementById('copy-addr-val').value = addr;
+                document.getElementById('qr-dest').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${addr}`;
+                
+                let total = 0;
                 const list = document.getElementById('asset-list');
                 list.innerHTML = '';
-                let total = 0;
                 COINS.forEach(c => {
                     const bal = this.user.balances[c.id] || 0;
                     const usd = bal * c.price;
@@ -856,43 +881,37 @@
                             <div class="asset-price">$${c.price.toLocaleString()}</div>
                         </div>
                         <div class="asset-right">
-                            <div class="asset-name">${bal.toLocaleString()} ${c.symbol}</div>
+                            <div class="asset-name">${bal.toFixed(4)} ${c.symbol}</div>
                             <div class="asset-price" style="color:var(--success)">$${usd.toFixed(2)}</div>
                         </div>
                     `;
-                    const img = div.querySelector('.asset-img');
-                    const fallback = div.querySelector('div[style*="display:none"]');
-                    img.onerror = () => {
-                        img.style.display = 'none';
-                        fallback.style.display = 'flex';
-                    };
                     list.appendChild(div);
                 });
                 document.getElementById('main-balance').innerText = `$${total.toFixed(2)}`;
-                document.getElementById('active-user-display').innerText = this.user.name;
-                document.getElementById('copy-addr-val').value = this.user.addr;
-                document.getElementById('qr-dest').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${this.user.addr}`;
+                this.renderHistoryList();
             }
 
-            renderHistory() {
+            renderHistoryList() {
                 const container = document.getElementById('history-list-container');
                 if(!container) return;
                 const userTxs = this.transactions.filter(tx => tx.from === this.user.name || tx.to === this.user.name).sort((a,b) => b.timestamp - a.timestamp);
                 container.innerHTML = userTxs.map(tx => {
                     const incoming = tx.to === this.user.name;
-                    return `
-                        <div class="history-item">
-                            <div class="history-icon"><i class="fas fa-${incoming ? 'arrow-down' : 'arrow-up'}"></i></div>
-                            <div class="history-details">
-                                <div class="history-title">${tx.description || (incoming ? 'Received' : 'Sent')}</div>
-                                <div class="history-date">${new Date(tx.timestamp).toLocaleString()}</div>
-                            </div>
-                            <div class="history-amount ${incoming ? 'history-positive' : 'history-negative'}">
-                                ${incoming ? '+' : '-'}${tx.amount.toFixed(2)} ${tx.currency.toUpperCase()}
-                            </div>
+                    return `<div class="history-item">
+                        <div class="history-icon"><i class="fas fa-${incoming?'arrow-down':'arrow-up'}"></i></div>
+                        <div class="history-details">
+                            <div class="history-title">${tx.description || (incoming?'Received':'Sent')}</div>
+                            <div class="history-date">${new Date(tx.timestamp).toLocaleString()}</div>
                         </div>
-                    `;
+                        <div class="history-amount ${incoming?'history-positive':'history-negative'}">${incoming?'+':'-'}${tx.amount.toFixed(2)} ${tx.currency.toUpperCase()}</div>
+                    </div>`;
                 }).join('') || '<p style="color:var(--text-dim); text-align:center;">No transactions</p>';
+            }
+
+            populateSelects() {
+                const selects = ['send-currency-select', 'deposit-currency-select', 'withdraw-currency-select', 'admin-currency-select'];
+                const options = COINS.map(c => `<option value="${c.id}">${c.symbol}</option>`).join('');
+                selects.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = options; });
             }
 
             openModal(type) {
@@ -904,141 +923,122 @@
                 if(type === 'withdraw') document.getElementById('modal-withdraw').style.display = 'block';
                 if(type === 'accounts') {
                     document.getElementById('modal-accounts').style.display = 'block';
-                    this.renderAccountList();
+                    const cont = document.getElementById('accounts-render');
+                    cont.innerHTML = this.allUsers.map(u => `<div class="asset-item" onclick="app.switchUser('${u.name}')" style="cursor:pointer; background:var(--surface-light); padding:14px; border-radius:18px; margin-bottom:10px;"><i class="fas fa-user-circle"></i><div>${u.name}</div>${u.name===this.user.name?'✓':''}</div>`).join('');
                 }
                 if(type === 'admin' && this.user.name === 'CentralCity') {
                     document.getElementById('modal-admin').style.display = 'block';
-                    this.populateAdminUserSelect();
-                    this.populateSelects();
+                    document.getElementById('admin-user-select').innerHTML = this.allUsers.filter(u => u.name !== 'CentralCity').map(u => `<option>${u.name}</option>`).join('');
                 }
                 overlay.style.display = 'flex';
             }
 
             closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
 
-            renderAccountList() {
-                const container = document.getElementById('accounts-render');
-                container.innerHTML = this.allUsers.map(u => `
-                    <div class="asset-item" onclick="app.switchUser('${u.name}')" style="background:var(--surface-light); padding:14px; border-radius:18px; margin-bottom:10px; cursor:pointer;">
-                        <i class="fas fa-user-circle" style="font-size:24px; color:var(--accent)"></i>
-                        <div class="asset-info">
-                            <div class="asset-name">${u.name}</div>
-                            <div class="asset-price">${u.addr ? u.addr.substring(0,10)+'...' : ''}</div>
-                        </div>
-                        ${u.name === this.user.name ? '<i class="fas fa-check" style="color:var(--success)"></i>' : ''}
-                    </div>
-                `).join('');
+            switchUser(name) {
+                const u = this.allUsers.find(u => u.name === name);
+                if(!u) return;
+                this.user = u;
+                localStorage.setItem('mindcase_last_user', u.name);
+                this.closeModal();
+                this.renderDashboard();
+                document.getElementById('admin-panel-btn').style.display = u.name === 'CentralCity' ? 'block' : 'none';
+                this.showToast(`Switched to ${u.name}`);
             }
 
-            switchUser(name) {
-                const u = this.allUsers.find(x => x.name === name);
-                if (!u) return;
-                this.user = u;
-                localStorage.setItem('mindcase_last_user', this.user.name);
-                this.closeModal();
-                this.render();
-                this.renderHistory();
-                const adminBtn = document.getElementById('admin-panel-btn');
-                if (adminBtn) {
-                    adminBtn.style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
-                }
-                this.showToast(`Switched to ${this.user.name}`);
+            async deleteAccount() {
+                const name = this.user.name;
+                this.allUsers = this.allUsers.filter(u => u.name !== name);
+                const tx = this.db.transaction('users', 'readwrite');
+                tx.objectStore('users').delete(name);
+                tx.oncomplete = async () => {
+                    if (this.allUsers.length > 0) {
+                        this.user = this.allUsers[0];
+                        localStorage.setItem('mindcase_last_user', this.user.name);
+                        this.renderDashboard();
+                        document.getElementById('admin-panel-btn').style.display = this.user.name === 'CentralCity' ? 'block' : 'none';
+                        this.showToast(`Account deleted. Switched to ${this.user.name}`);
+                    } else {
+                        this.user = null;
+                        localStorage.removeItem('mindcase_last_user');
+                        document.getElementById('main-ui').style.display = 'none';
+                        document.getElementById('screen-auth').style.display = 'flex';
+                        document.getElementById('reg-name').value = '';
+                        document.getElementById('reg-pass').value = '';
+                        this.closeModal();
+                        this.showToast('All accounts deleted');
+                    }
+                };
             }
 
             async confirmSend() {
-                const currency = document.getElementById('send-currency-select').value;
-                const recipient = document.getElementById('send-addr').value.trim();
-                const amount = parseFloat(document.getElementById('send-amount').value);
-                if(!recipient || isNaN(amount) || amount <= 0) return this.showToast('Invalid amount/recipient');
-                if((this.user.balances[currency]||0) < amount) return this.showToast('Insufficient balance');
-                const recipUser = this.allUsers.find(u => u.name === recipient || u.addr === recipient);
-                if(!recipUser) return this.showToast('Recipient not found');
-                if(recipUser.name === this.user.name) return this.showToast('Cannot send to yourself');
-
-                this.user.balances[currency] -= amount;
-                recipUser.balances[currency] = (recipUser.balances[currency]||0) + amount;
-
-                const tx = {
-                    from: this.user.name, to: recipUser.name, currency, amount,
-                    description: 'Sent', timestamp: Date.now()
-                };
+                const curr = document.getElementById('send-currency-select').value;
+                const to = document.getElementById('send-addr').value.trim();
+                const amt = parseFloat(document.getElementById('send-amount').value);
+                if(!to || isNaN(amt) || amt <= 0) return this.showToast('Invalid');
+                if((this.user.balances[curr]||0) < amt) return this.showToast('Insufficient balance');
+                const recip = this.allUsers.find(u => u.name === to || Object.values(u.addresses||{}).includes(to));
+                if(!recip) return this.showToast('Recipient not found');
+                if(recip.name === this.user.name) return this.showToast('Cannot send to yourself');
+                
+                this.user.balances[curr] -= amt;
+                recip.balances[curr] = (recip.balances[curr]||0) + amt;
+                const tx = { from: this.user.name, to: recip.name, currency: curr, amount: amt, description: 'Sent', timestamp: Date.now() };
                 await this.saveTransaction(tx);
                 await this.saveUser(this.user);
-                await this.saveUser(recipUser);
-
-                this.showToast('Payment sent');
+                await this.saveUser(recip);
                 this.closeModal();
-                this.render();
-                this.renderHistory();
+                this.renderDashboard();
+                this.showToast('Sent');
             }
 
             async deposit() {
-                const currency = document.getElementById('deposit-currency-select').value;
-                const amount = parseFloat(document.getElementById('deposit-amount').value);
-                if(isNaN(amount) || amount <= 0) return this.showToast('Invalid amount');
-                this.user.balances[currency] = (this.user.balances[currency]||0) + amount;
-                const tx = {
-                    from: 'External', to: this.user.name, currency, amount,
-                    description: 'Deposit', timestamp: Date.now()
-                };
+                const curr = document.getElementById('deposit-currency-select').value;
+                const amt = parseFloat(document.getElementById('deposit-amount').value);
+                if(isNaN(amt) || amt <= 0) return this.showToast('Invalid amount');
+                this.user.balances[curr] = (this.user.balances[curr]||0) + amt;
+                const tx = { from: 'External', to: this.user.name, currency: curr, amount: amt, description: 'Deposit', timestamp: Date.now() };
                 await this.saveTransaction(tx);
                 await this.saveUser(this.user);
-                this.showToast('Deposit successful');
                 this.closeModal();
-                this.render();
-                this.renderHistory();
+                this.renderDashboard();
+                this.showToast('Deposit successful');
             }
 
             async withdraw() {
-                const currency = document.getElementById('withdraw-currency-select').value;
-                const amount = parseFloat(document.getElementById('withdraw-amount').value);
-                if(isNaN(amount) || amount <= 0) return this.showToast('Invalid amount');
-                if((this.user.balances[currency]||0) < amount) return this.showToast('Insufficient balance');
-                this.user.balances[currency] -= amount;
-                const tx = {
-                    from: this.user.name, to: 'External', currency, amount,
-                    description: 'Withdrawal', timestamp: Date.now()
-                };
+                const curr = document.getElementById('withdraw-currency-select').value;
+                const amt = parseFloat(document.getElementById('withdraw-amount').value);
+                if(isNaN(amt) || amt <= 0) return this.showToast('Invalid');
+                if((this.user.balances[curr]||0) < amt) return this.showToast('Insufficient');
+                this.user.balances[curr] -= amt;
+                const tx = { from: this.user.name, to: 'External', currency: curr, amount: amt, description: 'Withdrawal', timestamp: Date.now() };
                 await this.saveTransaction(tx);
                 await this.saveUser(this.user);
-                this.showToast('Withdrawal successful');
                 this.closeModal();
-                this.render();
-                this.renderHistory();
+                this.renderDashboard();
+                this.showToast('Withdrawn');
             }
 
             async adminAction() {
                 if(this.user.name !== 'CentralCity') return;
                 const target = document.getElementById('admin-user-select').value;
-                const currency = document.getElementById('admin-currency-select').value;
-                const amount = parseFloat(document.getElementById('admin-amount').value);
-                if(!target || isNaN(amount) || amount === 0) return this.showToast('Invalid data');
+                const curr = document.getElementById('admin-currency-select').value;
+                const amt = parseFloat(document.getElementById('admin-amount').value);
+                if(!target || isNaN(amt) || amt === 0) return;
                 const targetUser = this.allUsers.find(u => u.name === target);
                 if(!targetUser) return;
-                targetUser.balances[currency] = (targetUser.balances[currency]||0) + amount;
-                if(targetUser.balances[currency] < 0) targetUser.balances[currency] = 0;
-                const tx = {
-                    from: amount > 0 ? 'CentralCity' : targetUser.name,
-                    to: amount > 0 ? targetUser.name : 'CentralCity',
-                    currency, amount: Math.abs(amount),
-                    description: amount > 0 ? 'Admin Deposit' : 'Admin Withdrawal',
-                    timestamp: Date.now()
-                };
+                targetUser.balances[curr] = (targetUser.balances[curr]||0) + amt;
+                if(targetUser.balances[curr] < 0) targetUser.balances[curr] = 0;
+                const tx = { from: amt>0 ? 'CentralCity' : target, to: amt>0 ? target : 'CentralCity', currency: curr, amount: Math.abs(amt), description: amt>0 ? 'Admin Deposit' : 'Admin Withdrawal', timestamp: Date.now() };
                 await this.saveTransaction(tx);
                 await this.saveUser(targetUser);
-                this.showToast('Admin action completed');
                 this.closeModal();
-                this.render();
-                this.renderHistory();
-            }
-
-            populateAdminUserSelect() {
-                const select = document.getElementById('admin-user-select');
-                if(select) select.innerHTML = this.allUsers.filter(u => u.name !== 'CentralCity').map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+                this.renderDashboard();
+                this.showToast('Admin action done');
             }
 
             copyAddress() {
-                navigator.clipboard.writeText(this.user.addr);
+                navigator.clipboard?.writeText(document.getElementById('copy-addr-val').value);
                 this.showToast('Address copied');
             }
 
@@ -1046,41 +1046,25 @@
                 document.getElementById('view-wallet').style.display = view === 'wallet' ? 'flex' : 'none';
                 document.getElementById('view-history').style.display = view === 'history' ? 'flex' : 'none';
                 document.getElementById('view-settings').style.display = view === 'settings' ? 'flex' : 'none';
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.classList.toggle('active', link.dataset.view === view);
-                });
-                if(view === 'history') this.renderHistory();
-                if(view === 'settings') {
-                    document.getElementById('theme-switch').checked = document.body.classList.contains('light');
-                }
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.view === view));
+                if(view === 'history') this.renderHistoryList();
             }
 
             showToast(msg) {
                 const t = document.getElementById('toast');
-                t.innerText = msg;
-                t.style.display = 'block';
+                t.textContent = msg; t.style.display = 'block';
                 setTimeout(() => t.style.display = 'none', 2000);
             }
 
             async logout() {
-                // Удаляем текущего пользователя из списка?
-                // Нет, просто переключаемся на другого, если есть, иначе показываем экран входа
-                const otherUsers = this.allUsers.filter(u => u.name !== this.user.name);
-                if (otherUsers.length > 0) {
-                    // Переключаемся на первого другого
-                    const nextUser = otherUsers[0];
-                    this.switchUser(nextUser.name);
-                    this.closeModal(); // если выход был из модалки аккаунтов
-                } else {
-                    // Аккаунтов больше нет — показываем экран входа
-                    this.user = null;
-                    localStorage.removeItem('mindcase_last_user');
-                    document.getElementById('main-ui').style.display = 'none';
-                    document.getElementById('screen-auth').style.display = 'flex';
-                    document.getElementById('reg-name').value = '';
-                    document.getElementById('reg-pass').value = '';
-                    this.closeModal();
-                }
+                // Кнопка "Add New Account" теперь просто выходит на экран авторизации для создания нового
+                this.user = null;
+                localStorage.removeItem('mindcase_last_user');
+                document.getElementById('main-ui').style.display = 'none';
+                document.getElementById('screen-auth').style.display = 'flex';
+                document.getElementById('reg-name').value = '';
+                document.getElementById('reg-pass').value = '';
+                this.closeModal();
             }
         }
 
